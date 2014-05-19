@@ -32,7 +32,7 @@ public class SignMessage extends Object {
         } else {
             SignMessage sm = new SignMessage(args[0]);
             // als erstes wird ein neues Schluesselpaar erzeugt
-            sm.generateKeyPair();
+            sm.generateKeyPair("foo");
             // eine Nachricht wird signiert und gespeichert
             sm.signAndSaveMessage(args[1]);
         }
@@ -41,15 +41,39 @@ public class SignMessage extends Object {
     /**
      * Diese Methode generiert ein neues Schluesselpaar.
      */
-    public void generateKeyPair() {
+    public void generateKeyPair(String userName) {
         try {
             // als Algorithmus verwenden wir RSA
             KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
             // mit gewuenschter Schluessellaenge initialisieren
             gen.initialize(2048);
             keyPair = gen.generateKeyPair();
+            PrivateKey privateKey = keyPair.getPrivate();
+            PublicKey publicKey = keyPair.getPublic();
+            //write Public Key
+            //TODO Funktioniert das wirklich so mit dem Datei erstellen?
+            DataOutputStream os = new DataOutputStream(new FileOutputStream(userName+".pub"));
+            os.write(userName.length());
+            os.write(userName.getBytes());
+            byte[] bary = publicKey.getEncoded();
+            os.write(bary.length);
+            os.write(bary);
+            os.close();
+
+            //Write private Key
+            //TODO Funktioniert das wirklich so mit dem Datei erstellen?
+            os = new DataOutputStream(new FileOutputStream(userName+".prv"));
+            os.write(userName.length());
+            os.write(userName.getBytes());
+            bary = privateKey.getEncoded();
+            os.write(bary.length);
+            os.write(bary);
+            os.close();
+
         } catch (NoSuchAlgorithmException ex) {
             showErrorAndExit("Es existiert kein KeyPairGenerator fuer RSA", ex);
+        } catch (IOException ex){
+            showErrorAndExit("IOException", ex);
         }
     }
 
