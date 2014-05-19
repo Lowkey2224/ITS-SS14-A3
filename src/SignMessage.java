@@ -61,7 +61,7 @@ public class SignMessage extends Object {
             os.close();
 
             //Write private Key
-            //TODO Funktioniert das wirklich so mit dem Datei erstellen?
+            //TODO Funktioniert das wirklichva   so mit dem Datei erstellen?
             os = new DataOutputStream(new FileOutputStream(userName+".prv"));
             os.write(userName.length());
             os.write(userName.getBytes());
