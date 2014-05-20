@@ -45,6 +45,7 @@ public class CipherEncryption {
             // mit doFinal abschliessen (Rest inkl. Padding ..)
             byte[] encRest = cipher.doFinal();
 
+
             // und angezeigt
             System.out.println("Verschluesselte Daten: " + new String(encData)
                     + new String(encRest));

@@ -23,20 +23,20 @@ public class KeyGen {
             //write Public Key
             //TODO Funktioniert das wirklich so mit dem Datei erstellen?
             DataOutputStream os = new DataOutputStream(new FileOutputStream(userName+".pub"));
-            os.write(userName.length());
+            os.writeInt(userName.length());
             os.write(userName.getBytes());
             byte[] bary = publicKey.getEncoded();
-            os.write(bary.length);
+            os.writeInt(bary.length);
             os.write(bary);
             os.close();
 
             //Write private Key
             //TODO Funktioniert das wirklichva   so mit dem Datei erstellen?
             os = new DataOutputStream(new FileOutputStream(userName+".prv"));
-            os.write(userName.length());
+            os.writeInt(userName.length());
             os.write(userName.getBytes());
             bary = privateKey.getEncoded();
-            os.write(bary.length);
+            os.writeInt(bary.length);
             os.write(bary);
             os.close();
 
