@@ -4,6 +4,7 @@
 import javax.crypto.*;
 import java.io.*;
 import java.security.*;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
@@ -12,7 +13,64 @@ import java.security.spec.X509EncodedKeySpec;
  */
 public class SSF {
 
-    public static PrivateKey readPrivateKeyFromFile(String filename, String algorithm)
+    private static final String RSA_ALGORITHM = "RSA";
+    private static final String AES_ALGORITHM = "AES";
+//    private static final String AES_ALGORITHM = "AES/CBC/PKCS5Padding";
+    private static final boolean WITH_IV = false;
+
+    public static void main(String[] args) {
+        if(args.length != 4){
+            System.out.println("Wrong Parameters given!");
+            return;
+        }
+        String prvkeyFile = args[0];
+        System.out.println("Private Key: "+ prvkeyFile);
+        String pubkeyFile = args[1];
+        System.out.println("Public Key: "+ pubkeyFile);
+        String datafile = args[2];
+        System.out.println("file to be encrypted: "+ datafile);
+        String outputFile = args[3];
+        System.out.println("encrypted file: "+ outputFile);
+
+//        String prvkeyFile = "MHuebner.prv";
+//        String pubkeyFile = "MHuebner.pub";
+//        String datafile = "src/ITSAufgabe3.pdf";
+//        String outputFile = "foo.ssf";
+
+        PrivateKey prvKey =  readPrivateKeyFromFile(prvkeyFile);
+
+        PublicKey pubKey = readPublicKeyFromFile(pubkeyFile);
+        SecretKey sk = createSecretKey();
+
+        byte[] encryptedSecretKey = encryptSecretKey(sk, pubKey);
+        byte[] singedKey = signSecretKey(sk, prvKey);
+
+        File outFile = new File(outputFile);
+        DataOutputStream os;
+        try {
+            os= new DataOutputStream(new FileOutputStream(outFile));
+            int f = encryptedSecretKey.length;
+            os.writeInt(f);
+
+
+//            os.write(encryptedSecretKey.length);
+
+            os.write(encryptedSecretKey);
+            os.writeInt(singedKey.length);
+            os.write(singedKey);
+            byte[] encryptedFileData = encryptDataFile(datafile, sk, os);
+//            os.write(encryptedFileData);
+            os.close();
+            System.out.println("File Encrypted");
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public static PrivateKey readPrivateKeyFromFile(String filename)
     {
         PrivateKey ret = null;
         byte[] message = null;
@@ -30,7 +88,7 @@ public class SSF {
             message = new byte[keyLength];
             is.read(message);
             is.close();
-            KeyFactory keyFactory = KeyFactory.getInstance(algorithm);
+            KeyFactory keyFactory = KeyFactory.getInstance(RSA_ALGORITHM);
             PKCS8EncodedKeySpec pkcs8EncodedKeySpec =  new PKCS8EncodedKeySpec(message);
             ret = keyFactory.generatePrivate(pkcs8EncodedKeySpec);
 
@@ -43,11 +101,11 @@ public class SSF {
         }
     }
 
-    public static PublicKey readPublicKeyFromFile(String filename, String algorithm)
+    public static PublicKey readPublicKeyFromFile(String filename)
     {
         PublicKey ret = null;
-        byte[] message = null;
-        DataInputStream is = null;
+        byte[] message;
+        DataInputStream is;
         try {
             is = new DataInputStream(new FileInputStream(
                     filename));
@@ -61,48 +119,48 @@ public class SSF {
             message = new byte[keyLength];
             is.read(message);
             is.close();
-            KeyFactory keyFactory = KeyFactory.getInstance(algorithm);
+            KeyFactory keyFactory = KeyFactory.getInstance(RSA_ALGORITHM);
             X509EncodedKeySpec x509EncodedKeySpec =  new X509EncodedKeySpec(message);
-            ret = keyFactory.generatePublic(x509EncodedKeySpec);
-//            ret = new RSAPrivateKeyImpl();
+            return keyFactory.generatePublic(x509EncodedKeySpec);
 
         } catch (java.io.IOException e) {
             e.printStackTrace();
-        }finally {
-
-            return ret;
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
 
         }
+        return null;
     }
 
     public static SecretKey createSecretKey()
     {
-        KeyGenerator kg = null;
         try {
-            kg = KeyGenerator.getInstance("AES");
+            KeyGenerator kg = KeyGenerator.getInstance(AES_ALGORITHM);
+            kg.init(128); // Schluessellaenge
+            return kg.generateKey();
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
+            return null;
         }
-        kg.init(128); // Schluessellaenge
-        SecretKey skey = kg.generateKey();
-        return  skey;
+
     }
 
     public static byte[] signSecretKey(SecretKey key, PrivateKey privateKey)
     {
-        byte[] keyBytes = key.getEncoded();
-        Signature rsaSig = null;
-        byte[] signature = null;
+
+        Signature rsaSig;
+        byte[] signature;
         try {
             // als Erstes erzeugen wir das Signatur-Objekt
             rsaSig = Signature.getInstance("SHA1withRSA");
             // zum Signieren benoetigen wir den privaten Schluessel (hier: RSA)
             rsaSig.initSign(privateKey);
             // Daten fuer die kryptographische Hashfunktion (hier: SHA1) liefern
-            rsaSig.update(keyBytes);
+            rsaSig.update(key.getEncoded());
             // Signatur durch Verschluesselung des Hashwerts (mit privatem RSA-Schluessel) erzeugen
-            signature = rsaSig.sign();
-            return signature;
+            return rsaSig.sign();
         } catch (InvalidKeyException e) {
             e.printStackTrace();
         }
@@ -119,24 +177,7 @@ public class SSF {
         try {
             Cipher cipher = Cipher.getInstance("RSA");
             cipher.init(Cipher.ENCRYPT_MODE, pk);
-//            System.out.println("Cipher Parameter: "
-//                    + cipher.getParameters().toString());
-//            AlgorithmParameters ap = cipher.getParameters();
-
-            // die zu schuetzenden Daten
-            byte[] plain = sk.getEncoded();
-
-            // nun werden die Daten verschluesselt
-            // (update wird bei grossen Datenmengen mehrfach aufgerufen werden!)
-            byte[] encData = cipher.update(plain);
-
-            // mit doFinal abschliessen (Rest inkl. Padding ..)
-            byte[] encRest = cipher.doFinal();
-            byte[] both = new byte[encData.length+encRest.length];
-
-            System.arraycopy(encData, 0, both, 0, encData.length);
-            System.arraycopy(encRest, 0, both, encData.length, encRest.length);
-            return both;
+            return cipher.doFinal(sk.getEncoded());
 
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -156,8 +197,7 @@ public class SSF {
     {
         DataInputStream is = null;
         try {
-//            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            Cipher cipher = Cipher.getInstance("AES");
+            Cipher cipher = Cipher.getInstance(AES_ALGORITHM);
 
             // Initialisierung
             cipher.init(Cipher.ENCRYPT_MODE, skey);
@@ -226,53 +266,6 @@ public class SSF {
         {
             e.printStackTrace();
             return null;
-        }
-
-    }
-
-    public static void main(String[] args) {
-        if(args.length != 4){
-            System.out.println("Wrong Parameters given!");
-            return;
-        }
-        /*String prvkeyFile = args[0];
-        String pubkeyFile = args[1];
-        String datafile = args[2];
-        String outputFile = args[3];
-        */
-
-        String prvkeyFile = "MHuebner.prv";
-        String pubkeyFile = "MHuebner.pub";
-        String datafile = "src/ITSAufgabe3.pdf";
-        String outputFile = "foo.ssf";
-
-        PrivateKey prvKey =  readPrivateKeyFromFile(prvkeyFile,"RSA");
-        PublicKey pubKey = readPublicKeyFromFile(pubkeyFile, "RSA");
-        SecretKey sk = createSecretKey();
-        byte[] encryptedSecretKey = encryptSecretKey(sk, pubKey);
-        byte[] singedKey = signSecretKey(sk, prvKey);
-
-        File outFile = new File(outputFile);
-        DataOutputStream os;
-        try {
-            os= new DataOutputStream(new FileOutputStream(outFile));
-            int f = encryptedSecretKey.length;
-            os.writeInt(f);
-
-
-//            os.write(encryptedSecretKey.length);
-
-            os.write(encryptedSecretKey);
-            os.writeInt(singedKey.length);
-            os.write(singedKey);
-            byte[] encryptedFileData = encryptDataFile(datafile, sk, os);
-//            os.write(encryptedFileData);
-            os.close();
-            System.out.println("File Encrypted");
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
     }

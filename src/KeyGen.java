@@ -8,26 +8,35 @@ import java.security.*;
  */
 public class KeyGen {
 
+    public static void main(String[] args) {
+        if(args.length != 1)
+        {
+            System.out.println("Wrong argument Coutn");
+            return ;
+        }
+        generateKeyPair(args[0]);
+    }
+
     /**
      * Diese Methode generiert ein neues Schluesselpaar.
      */
-    public void generateKeyPair(String userName) {
+    public static void generateKeyPair(String userName) {
         try {
             // als Algorithmus verwenden wir RSA
             KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
             // mit gewuenschter Schluessellaenge initialisieren
             gen.initialize(2048);
             KeyPair keyPair = gen.generateKeyPair();
-            PrivateKey privateKey = keyPair.getPrivate();
-            PublicKey publicKey = keyPair.getPublic();
+
             //write Public Key
             //TODO Funktioniert das wirklich so mit dem Datei erstellen?
             DataOutputStream os = new DataOutputStream(new FileOutputStream(userName+".pub"));
             os.writeInt(userName.length());
             os.write(userName.getBytes());
-            byte[] bary = publicKey.getEncoded();
+            byte[] bary = keyPair.getPublic().getEncoded();
             os.writeInt(bary.length);
             os.write(bary);
+            os.flush();
             os.close();
 
             //Write private Key
@@ -35,9 +44,10 @@ public class KeyGen {
             os = new DataOutputStream(new FileOutputStream(userName+".prv"));
             os.writeInt(userName.length());
             os.write(userName.getBytes());
-            bary = privateKey.getEncoded();
+            bary = keyPair.getPrivate().getEncoded();
             os.writeInt(bary.length);
             os.write(bary);
+            os.flush();
             os.close();
 
         } catch (NoSuchAlgorithmException ex) {
@@ -54,7 +64,7 @@ public class KeyGen {
      * @param msg eine Beschreibung fuer den Fehler
      * @param ex  die Ausnahme, die den Fehler ausgeloest hat
      */
-    private void showErrorAndExit(String msg, Exception ex) {
+    private static void showErrorAndExit(String msg, Exception ex) {
         System.out.println(msg);
         System.out.println(ex.getMessage());
         System.exit(0);

@@ -9,12 +9,19 @@ import java.security.*;
  */
 public class RSF {
     public static void main(String[] args) {
-        String privateKeyfile = "MHuebner.prv";
-        String publicKeyfile = "MHuebner.pub";
-        String datafile = "foo.ssf";
-        String outputFile = "foo.pdf";
-        PublicKey publicKey = SSF.readPublicKeyFromFile(publicKeyfile, "RSA");
-        PrivateKey privateKey = SSF.readPrivateKeyFromFile(privateKeyfile, "RSA");
+        if(args.length != 3)
+        {
+            System.out.println("Wrong argumentcount");
+        }
+//        String privateKeyfile = "MHuebner.prv";
+//        String datafile = "foo.ssf";
+//        String outputFile = "foo.pdf";
+
+        String privateKeyfile = args[0];
+        String datafile = args[1];
+        String outputFile = args[2];
+
+        PrivateKey privateKey = SSF.readPrivateKeyFromFile(privateKeyfile);
         SecretKey sk;
         File encryptedFile = new File(datafile);
         DataInputStream is;
@@ -34,16 +41,10 @@ public class RSF {
                 System.out.println("FUCK!");
                 return;
             }
-            byte[] message = new byte[(int)restBytes];
-            is.read(message);
-            is.close();
-            sk = decryptSecretKey(keyArray, privateKey);
-            byte[] decryptedData = decryptDataFile(datafile, sk, outputFile);
-//            File out = new File(outputFile);
-//            DataOutputStream os = new DataOutputStream(new FileOutputStream(out));
-//            os.write(decryptedData);
-//            os.close();
 
+            sk = decryptSecretKey(keyArray, privateKey);
+            decryptDataFile(is, sk, outputFile);
+            is.close();
 
 
         } catch (FileNotFoundException e) {
@@ -98,12 +99,11 @@ public class RSF {
         return null;
     }
 
-    public static byte[] decryptDataFile(String filename, SecretKey secretKey, String outFile)
+    public static void decryptDataFile(DataInputStream is, SecretKey secretKey, String outFile)
     {
-        DataInputStream is = null;
         try {
-//            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            Cipher cipher = Cipher.getInstance("AES");
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+//            Cipher cipher = Cipher.getInstance("AES");
 
             // Initialisierung
 
@@ -113,8 +113,8 @@ public class RSF {
             foo.readFully(v);
             foo.close();
 
-//            cipher.init(Cipher.DECRYPT_MODE, skey, new IvParameterSpec(v));
-            cipher.init(Cipher.DECRYPT_MODE, secretKey);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, new IvParameterSpec(v));
+//            cipher.init(Cipher.DECRYPT_MODE, secretKey);
 
             // Der Initialisierungsvektor IV muss dem EMPFAENGER spaeter als
             // Parameter mit uebergeben werden (falls nicht Betrieb im
@@ -126,23 +126,19 @@ public class RSF {
                 AlgorithmParameters ap = cipher.getParameters();
             }
 
-
-            // die zu schuetzenden Daten
-            File file = new File(filename);
             File out = new File(outFile);
             DataOutputStream os = new DataOutputStream(new FileOutputStream(out));
-            is = new DataInputStream(new FileInputStream(
-                    file));
+
 
             byte[] plain = new byte[16];
-            int bytesRead = 0;
-            int fileLengthModulo = (int)(file.length()%16);
+            int bytesRead;
+
             while (( bytesRead =is.read(plain)) == 16)
             {
                 os.write(cipher.update(plain));
                 plain = new byte[16];
             }
-            if(fileLengthModulo!=0)
+            if(bytesRead > 0)
             {
                 byte[] rest = new byte[bytesRead];
                 System.arraycopy(plain, 0, rest, 0, bytesRead);
@@ -150,25 +146,11 @@ public class RSF {
             }else{
                 os.write(cipher.doFinal());
             }
-//            is.readFully(plain);
-//            System.out.println("Daten: " + new String(plain));
 
-            // nun werden die Daten verschluesselt
-            // (update wird bei grossen Datenmengen mehrfach aufgerufen werden!)
-//            byte[] encData = cipher.update();
-
-            // mit doFinal abschliessen (Rest inkl. Padding ..)
-//            byte[] encRest = cipher.doFinal(plain);
-//            byte[] both = new byte[encData.length+encRest.length];
-//
-//            System.arraycopy(encData, 0, both, 0, encData.length);
-//            System.arraycopy(encRest, 0, both, encData.length, encRest.length);
             os.close();
-            return plain;
         }catch (Exception e)
         {
             e.printStackTrace();
-            return null;
         }
 
     }
