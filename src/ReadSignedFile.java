@@ -7,7 +7,7 @@ import java.io.*;
  * SHA-1/RSA-Signatur und oeffentlichem Schluessel im X.509-Format geoeffnet und
  * die Signatur mit Hilfe des oeffentlichen Schluessels verifiziert.
  */
-public class ReadSignedFile extends Object {
+public class ReadSignedFile{
 
     // Name der Datei, aus der die signierte Nachricht gelesen wird
     public String fileName;
