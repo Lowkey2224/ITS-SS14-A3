@@ -1,5 +1,5 @@
-import com.sun.deploy.util.ArrayUtil;
-import sun.security.rsa.RSAPrivateKeyImpl;
+
+
 
 import javax.crypto.*;
 import java.io.*;
@@ -33,7 +33,6 @@ public class SSF {
             KeyFactory keyFactory = KeyFactory.getInstance(algorithm);
             PKCS8EncodedKeySpec pkcs8EncodedKeySpec =  new PKCS8EncodedKeySpec(message);
             ret = keyFactory.generatePrivate(pkcs8EncodedKeySpec);
-//            ret = new RSAPrivateKeyImpl();
 
         } catch (java.io.IOException e) {
             e.printStackTrace();
@@ -153,12 +152,12 @@ public class SSF {
         return null;
     }
 
-    public static byte[] encryptDataFile(String filename, SecretKey skey)
+    public static byte[] encryptDataFile(String filename, SecretKey skey, DataOutput os)
     {
         DataInputStream is = null;
         try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-//            Cipher cipher = Cipher.getInstance("AES");
+//            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            Cipher cipher = Cipher.getInstance("AES");
 
             // Initialisierung
             cipher.init(Cipher.ENCRYPT_MODE, skey);
@@ -188,21 +187,41 @@ public class SSF {
             {
                 return null;
             }
-            byte[] plain = new byte[(int)length];
-            is.readFully(plain);
+
+
+            byte[] plain = new byte[16];
+            int bytesRead;
+            int fileLengthModulo = (int)(file.length()%16);
+            while (( bytesRead =is.read(plain)) == 16)
+            {
+                os.write(cipher.update(plain));
+                plain = new byte[16];
+            }
+            if(fileLengthModulo!=0)
+            {
+                byte[] rest = new byte[bytesRead];
+                System.arraycopy(plain, 0, rest, 0, bytesRead);
+                os.write(cipher.doFinal(rest));
+            }else{
+                os.write(cipher.doFinal());
+            }
+
+
+//            byte[] plain = new byte[(int)length];
+//            is.readFully(plain);
 //            System.out.println("Daten: " + new String(plain));
 
             // nun werden die Daten verschluesselt
             // (update wird bei grossen Datenmengen mehrfach aufgerufen werden!)
-            byte[] encData = cipher.update(plain);
-
-            // mit doFinal abschliessen (Rest inkl. Padding ..)
-            byte[] encRest = cipher.doFinal();
-            byte[] both = new byte[encData.length+encRest.length];
-
-            System.arraycopy(encData, 0, both, 0, encData.length);
-            System.arraycopy(encRest, 0, both, encData.length, encRest.length);
-            return both;
+//            byte[] encData = cipher.update(plain);
+//
+//            mit doFinal abschliessen (Rest inkl. Padding ..)
+//            byte[] encRest = cipher.doFinal();
+//            byte[] both = new byte[encData.length+encRest.length];
+//
+//            System.arraycopy(encData, 0, both, 0, encData.length);
+//            System.arraycopy(encRest, 0, both, encData.length, encRest.length);
+            return plain;
         }catch (Exception e)
         {
             e.printStackTrace();
@@ -213,6 +232,7 @@ public class SSF {
 
     public static void main(String[] args) {
         if(args.length != 4){
+            System.out.println("Wrong Parameters given!");
             return;
         }
         /*String prvkeyFile = args[0];
@@ -221,9 +241,9 @@ public class SSF {
         String outputFile = args[3];
         */
 
-        String prvkeyFile = "Z:\\pub\\ITS\\ITS-SS14-A3\\MHuebner.prv";
+        String prvkeyFile = "MHuebner.prv";
         String pubkeyFile = "MHuebner.pub";
-        String datafile = "JCA_JCE-Einfuehrung.pdf";
+        String datafile = "src/ITSAufgabe3.pdf";
         String outputFile = "foo.ssf";
 
         PrivateKey prvKey =  readPrivateKeyFromFile(prvkeyFile,"RSA");
@@ -231,7 +251,7 @@ public class SSF {
         SecretKey sk = createSecretKey();
         byte[] encryptedSecretKey = encryptSecretKey(sk, pubKey);
         byte[] singedKey = signSecretKey(sk, prvKey);
-        byte[] encryptedFileData = encryptDataFile(datafile, sk);
+
         File outFile = new File(outputFile);
         DataOutputStream os;
         try {
@@ -245,8 +265,10 @@ public class SSF {
             os.write(encryptedSecretKey);
             os.writeInt(singedKey.length);
             os.write(singedKey);
-            os.write(encryptedFileData);
+            byte[] encryptedFileData = encryptDataFile(datafile, sk, os);
+//            os.write(encryptedFileData);
             os.close();
+            System.out.println("File Encrypted");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {

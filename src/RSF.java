@@ -38,11 +38,11 @@ public class RSF {
             is.read(message);
             is.close();
             sk = decryptSecretKey(keyArray, privateKey);
-            byte[] decryptedData = decryptDataFile(datafile, sk);
-            File out = new File(outputFile);
-            DataOutputStream os = new DataOutputStream(new FileOutputStream(out));
-            os.write(decryptedData);
-            os.close();
+            byte[] decryptedData = decryptDataFile(datafile, sk, outputFile);
+//            File out = new File(outputFile);
+//            DataOutputStream os = new DataOutputStream(new FileOutputStream(out));
+//            os.write(decryptedData);
+//            os.close();
 
 
 
@@ -65,22 +65,21 @@ public class RSF {
 //            AlgorithmParameters ap = cipher.getParameters();
 
             // die zu schuetzenden Daten
-            byte[] plain = sk;
+
 
             // nun werden die Daten verschluesselt
             // (update wird bei grossen Datenmengen mehrfach aufgerufen werden!)
 //            byte[] encData = cipher.update();
 
             // mit doFinal abschliessen (Rest inkl. Padding ..)
-            byte[] encRest = cipher.doFinal(plain);
+            byte[] encRest = cipher.doFinal(sk);
 //            byte[] both = new byte[encData.length+encRest.length];
 //
 //            System.arraycopy(encData, 0, both, 0, encData.length);
 //            System.arraycopy(encRest, 0, both, encData.length, encRest.length);
 ////            KeyFactory keyFactory = KeyFactory.getInstance("AES");
 
-            SecretKey originalKey = new SecretKeySpec(encRest, "AES");
-            return originalKey;
+            return new SecretKeySpec(encRest, "AES");
 
 
 
@@ -99,12 +98,12 @@ public class RSF {
         return null;
     }
 
-    public static byte[] decryptDataFile(String filename, SecretKey skey, String outFile)
+    public static byte[] decryptDataFile(String filename, SecretKey secretKey, String outFile)
     {
         DataInputStream is = null;
         try {
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-//            Cipher cipher = Cipher.getInstance("AES");
+//            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            Cipher cipher = Cipher.getInstance("AES");
 
             // Initialisierung
 
@@ -114,7 +113,8 @@ public class RSF {
             foo.readFully(v);
             foo.close();
 
-            cipher.init(Cipher.DECRYPT_MODE, skey, new IvParameterSpec(v));
+//            cipher.init(Cipher.DECRYPT_MODE, skey, new IvParameterSpec(v));
+            cipher.init(Cipher.DECRYPT_MODE, secretKey);
 
             // Der Initialisierungsvektor IV muss dem EMPFAENGER spaeter als
             // Parameter mit uebergeben werden (falls nicht Betrieb im
@@ -135,17 +135,22 @@ public class RSF {
                     file));
 
             byte[] plain = new byte[16];
-            while (is.read(plain) == 16)
+            int bytesRead = 0;
+            int fileLengthModulo = (int)(file.length()%16);
+            while (( bytesRead =is.read(plain)) == 16)
             {
                 os.write(cipher.update(plain));
+                plain = new byte[16];
             }
-            if(file.length()%16!=0)
+            if(fileLengthModulo!=0)
             {
-                os.write(cipher.doFinal(plain));
+                byte[] rest = new byte[bytesRead];
+                System.arraycopy(plain, 0, rest, 0, bytesRead);
+                os.write(cipher.doFinal(rest));
             }else{
                 os.write(cipher.doFinal());
             }
-            is.readFully(plain);
+//            is.readFully(plain);
 //            System.out.println("Daten: " + new String(plain));
 
             // nun werden die Daten verschluesselt
@@ -153,12 +158,13 @@ public class RSF {
 //            byte[] encData = cipher.update();
 
             // mit doFinal abschliessen (Rest inkl. Padding ..)
-            byte[] encRest = cipher.doFinal(plain);
+//            byte[] encRest = cipher.doFinal(plain);
 //            byte[] both = new byte[encData.length+encRest.length];
 //
 //            System.arraycopy(encData, 0, both, 0, encData.length);
 //            System.arraycopy(encRest, 0, both, encData.length, encRest.length);
-            return encRest;
+            os.close();
+            return plain;
         }catch (Exception e)
         {
             e.printStackTrace();
@@ -166,6 +172,5 @@ public class RSF {
         }
 
     }
-
 
 }
